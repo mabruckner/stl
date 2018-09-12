@@ -27,11 +27,11 @@ named!(vert_text<&[u8], Vertex>, map!(ws!(preceded!(tag!("vertex"), tuple!(float
 
 named!(tri_text<&[u8], Triangle>, map!(ws!(do_parse!(tag!("facet") >> tag!("normal") >> float >> float >> float >> tag!("outer") >> tag!("loop") >> a:vert_text >> b:vert_text >> c:vert_text >> tag!("endloop") >> tag!("endfacet") >> (a, b, c))), |(a,b,c)|{ [a,b,c]}));
 
-named!(solid_text<&[u8], Solid>, ws!(do_parse!(tag!("solid") >> name: is_not!("\r\n") >> tris: many0!(tri_text) >> tag!("endsolid") >> tag!(name) >> (tris))));
+named!(solid_text<&[u8], Solid>, ws!(do_parse!(tag!("solid") >> name: is_not!("\r\n") >> tris: many0!(tri_text) >> tag!("endsolid") >> (tris))));
 
 pub fn from_ascii(text: &[u8]) -> Option<Solid> {
     match solid_text(text) {
-        nom::IResult::Done(_, o) => Some(o),
+        Ok((_, o)) => Some(o),
         x => {
             println!("{:?}", x);
             None
@@ -41,7 +41,7 @@ pub fn from_ascii(text: &[u8]) -> Option<Solid> {
 
 pub fn from_bin(bin: &[u8]) -> Option<Solid> {
     match solid_bin(bin) {
-        nom::IResult::Done(_, o) => Some(o),
+        Ok((_, o)) => Some(o),
         _ => None
     }
 }
@@ -51,4 +51,20 @@ pub fn read_stl(data: &[u8]) -> Option<Solid> {
         Some(thing) => Some(thing),
         None => from_bin(data)
     }
+}
+
+pub fn compute_normal(face: &[[f32; 3]; 3]) -> [f32; 3] {
+    let mut out = [0.0; 3];
+    let mut l = 0.0;
+    for i in 0..3 {
+        let a = (i+1)%3;
+        let b = (i+2)%3;
+        out[i] = (face[1][a]-face[0][a])*(face[2][b]-face[0][b]) - (face[1][b]-face[0][b])*(face[2][a]-face[0][a]);
+        l = l+out[i]*out[i];
+    }
+    l = l.sqrt();
+    for i in 0..3 {
+        out[i] = out[i]/l;
+    }
+    out
 }
